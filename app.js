@@ -31,7 +31,8 @@ mongoose.connect('mongodb://127.0.0.1:27017/userDB', {useNewUrlParser:true});
 
 const userSchema = new mongoose.Schema({
     email: String,
-    password: String
+    password: String,
+    secret: String
   });
 
 // userSchema.plugin(encrypt, {secret:process.env.secret,excludeFromEncryption:['email']});
@@ -45,15 +46,25 @@ passport.use(User.createStrategy());
 passport.serializeUser(User.serializeUser());
 passport.deserializeUser(User.deserializeUser());
 
-async function findUser(reqUsername, reqPassword) {
+// async function findUser(reqUsername, reqPassword) {
 
-  const findUser = await User.findOne({ email: reqUsername });
+//   const findUser = await User.findOne({ email: reqUsername });
 
-  const matchPw = await bcrypt.compare(reqPassword, findUser.password)
+//   const matchPw = await bcrypt.compare(reqPassword, findUser.password)
 
-  if (matchPw) {
+//   if (matchPw) {
+//     return findUser;
+//   }
+// }
+
+async function findUser(reqUserId){
+
+  const findUser = await User.findById({_id:reqUserId});
+
+  if (findUser){
     return findUser;
   }
+
 }
 
 app.get("/", function (req, res) {
@@ -74,11 +85,17 @@ app.get("/login", function (req, res) {
 });
 
 app.get('/secrets', function(req, res){
-  if(req.isAuthenticated()){
-    res.render('secrets');
-  } else {
-    res.redirect('/login');
-  }
+  // if(req.isAuthenticated()){
+  //   res.render('secrets');
+  // } else {
+  //   res.redirect('/login');
+  // }
+  findUser(req.user.id).then(function(foundUser){
+    if(foundUser){
+      const arr = Object.values(foundUser);
+      res.render('secrets',{userWithSecrets:arr})
+    }
+  });
 });
 
 app.get("/register", function (req, res) {
@@ -108,6 +125,25 @@ app.post("/register", function (req, res) {
 
   //   res.render("secrets");
   // });
+});
+
+app.get("/submit", function (req, res) {
+  res.render("submit");
+});
+
+
+app.post("/submit", function (req, res){
+  const submittedContent = req.body.secret;
+
+  findUser(req.user.id).then(function(foundUser){
+    if (foundUser){
+      foundUser.secret = submittedContent;
+      foundUser.save();
+      res.redirect('/secrets');
+    } else {
+      res.redirect('/')
+    }
+  });
 });
 
 app.post("/login",function(req, res){
